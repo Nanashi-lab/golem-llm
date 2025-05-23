@@ -178,24 +178,29 @@ jobs:
       - name: Build application
         run: cargo make build
       
-      # Start Golem server using Docker
-      - name: Start Golem server
+      # Download and start Golem server binary
+      - name: Download and start Golem server
         run: |
+          echo "Downloading Golem server binary..."
+          curl -L -o golem-x86_64-unknown-linux-gnu \
+            https://github.com/golemcloud/golem/releases/download/v1.2.3/golem-x86_64-unknown-linux-gnu
+          chmod +x golem-x86_64-unknown-linux-gnu
+          sudo mv golem-x86_64-unknown-linux-gnu /usr/local/bin/golem
+          
           echo "Starting Golem server on port 9881..."
-          docker run -d --name golem-server \
-            -p 9881:9881 \
-            golemservices/golem-server:latest
+          golem server run &
+          GOLEM_PID=$!
+          echo "GOLEM_PID=$GOLEM_PID" >> $GITHUB_ENV
           
-          # Wait for Golem server to be ready
-          echo "Waiting for Golem server to be ready..."
-          timeout 60 bash -c 'until curl -s http://localhost:9881/healthcheck || curl -s http://localhost:9881/v1/health; do sleep 2; echo "Waiting for Golem server..."; done'
+          echo "Waiting for Golem server to start..."
+          sleep 10
           
-          # Verify Golem server is running
-          if curl -s http://localhost:9881/healthcheck > /dev/null 2>&1 || curl -s http://localhost:9881/v1/health > /dev/null 2>&1; then
-            echo "Golem server is ready and running on port 9881"
+          echo "Checking if Golem server is running on port 9881..."
+          if netstat -tuln | grep -q ":9881 "; then
+            echo "Golem server is running on port 9881"
           else
-            echo "Failed to start Golem server"
-            docker logs golem-server
+            echo "Golem server failed to start"
+            ps aux | grep golem || true
             exit 1
           fi
       
