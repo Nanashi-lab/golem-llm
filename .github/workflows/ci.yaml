@@ -183,7 +183,7 @@ jobs:
         run: |
           echo "Downloading Golem server binary..."
           curl -L -o golem-x86_64-unknown-linux-gnu \
-            https://github.com/golemcloud/golem/releases/download/v1.2.3/golem-x86_64-unknown-linux-gnu
+            https://github.com/golemcloud/golem-cli/releases/download/v1.2.3/golem-x86_64-unknown-linux-gnu
           chmod +x golem-x86_64-unknown-linux-gnu
           sudo mv golem-x86_64-unknown-linux-gnu /usr/local/bin/golem
           
@@ -216,12 +216,7 @@ jobs:
       - name: Create worker with Ollama configuration
         run: |
           cd test
-          # Set the OLLAMA_BASE_URL to point to our local instance
-          # Note: Using HTTP (not HTTPS) for local testing
-          echo "Creating worker with Ollama configuration..."
-          golem-cli worker new test:llm/ollamatest \
-            --env OLLAMA_BASE_URL=http://localhost:11434 \
-            --env GOLEM_LLM_LOG=trace
+          golem-cli worker new test:llm/ollamatest
           echo "Worker created successfully"
         
       # Run integration tests
