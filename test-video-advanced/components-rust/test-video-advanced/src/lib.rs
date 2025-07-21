@@ -4,7 +4,6 @@ mod bindings;
 use crate::bindings::exports::test::video_advanced_exports::test_video_api::*;
 use crate::bindings::golem::video_generation::types;
 use crate::bindings::golem::video_generation::{video_generation, advanced, lip_sync};
-use std::fs;
 use std::fs::File;
 use std::io::Read;
 use std::thread;
@@ -609,36 +608,22 @@ impl Guest for Component {
 // Helper function to save video result
 fn save_video_result(video_result: &types::VideoResult, test_name: &str) -> String {
     if let Some(videos) = &video_result.videos {
+        if videos.is_empty() {
+            return "No videos in result".to_string();
+        }
+        // Handle multiple videos by collecting all results
+        let mut results = Vec::new();
+        
         for (i, video_data) in videos.iter().enumerate() {
-            let filename = format!("/output/video-{}-{}.mp4", test_name, i);
-            
-            // Create output directory if it doesn't exist
-            if let Err(err) = fs::create_dir_all("/output") {
-                return format!("Failed to create output directory: {}", err);
-            }
-            
-            // Save the video data
-            match &video_data.base64_bytes {
-                Some(video_bytes) => {
-                    match fs::write(&filename, video_bytes) {
-                        Ok(_) => {
-                            return filename;
-                        }
-                        Err(err) => {
-                            return format!("Failed to save video to {}: {}", filename, err);
-                        }
-                    }
-                }
-                None => {
-                    if let Some(uri) = &video_data.uri {
-                        return format!("Video available at URI: {}", uri);
-                    } else {
-                        return "No video data or URI available".to_string();
-                    }
-                }
+            // Since we no longer download video data, just display the URL
+            if let Some(uri) = &video_data.uri {
+                results.push(format!("Video {}-{} available at URI: {}", test_name, i, uri));
+            } else {
+                results.push(format!("No URI available for video {}-{}", test_name, i));
             }
         }
-        "No videos in result".to_string()
+        // Join all results with newlines
+        results.join("\n")
     } else {
         "No videos in result".to_string()
     }

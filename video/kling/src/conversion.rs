@@ -434,7 +434,7 @@ pub fn poll_video_generation(
 
             let video = Video {
                 uri: Some(uri),
-                base64_bytes: Some(video_data),
+                base64_bytes: video_data,
                 mime_type,
                 width: None,
                 height: None,
