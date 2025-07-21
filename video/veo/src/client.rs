@@ -136,20 +136,9 @@ impl VeoApi {
         trace!("Received response with status: {status}");
 
         if status.is_success() {
-            // Get the raw response text first for debugging
-            let response_text = response
-                .text()
-                .map_err(|err| from_reqwest_error("Failed to read response text", err))?;
-
-            trace!("Raw response JSON: {response_text}");
-
-            // Try to parse the JSON
-            let operation_response: OperationResponse = serde_json::from_str(&response_text)
-                .map_err(|err| {
-                    trace!("JSON parsing failed with error: {err}");
-                    trace!("Failed to parse this JSON: {response_text}");
-                    VideoError::InternalError(format!("Failed to parse operation response: {err}"))
-                })?;
+            let operation_response: OperationResponse = response
+                .json()
+                .map_err(|err| from_reqwest_error("Failed to parse operation response", err))?;
 
             trace!("Successfully parsed OperationResponse: {operation_response:?}");
 
@@ -360,7 +349,6 @@ pub struct VideoResultData {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OperationResponse {
     pub name: String,
-    /// Whether the operation is complete. When still processing, this field may be absent.
     pub done: Option<bool>,
     pub response: Option<VeoResponse>,
 }

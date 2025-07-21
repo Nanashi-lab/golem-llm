@@ -34,15 +34,13 @@ pub fn media_input_to_request(
     // Storage URI from provider options
     let storage_uri = options.get("storage_uri").cloned();
 
-    // Determine model - default to veo-2.0-generate-001, can be overridden
-    let model_id = config.model.clone().or_else(|| {
-        options
-            .get("model")
-            .cloned()
-            .or_else(|| Some("veo-2.0-generate-001".to_string()))
-    });
+    // Determine model - default to veo-2.0-generate-001
+    let model_id = config
+        .model
+        .clone()
+        .or_else(|| Some("veo-2.0-generate-001".to_string()));
 
-    // Validate model if provided
+    // Validate model if provided, only warn
     if let Some(ref model) = model_id {
         if !matches!(
             model.as_str(),
@@ -57,27 +55,17 @@ pub fn media_input_to_request(
     // Determine aspect ratio
     let aspect_ratio = determine_aspect_ratio(config.aspect_ratio, config.resolution)?;
 
-    // Duration support - Veo supports 5-8 seconds for veo-2.0, 8 seconds for veo-3.0
+    // Duration support, 5 or 8 seconds, 8 seconds is only supported by veo-2.0
     let duration_seconds = match config.duration_seconds {
         Some(d) => {
             let duration = d.round() as u32;
-            if model_id.as_deref() == Some("veo-3.0-generate-preview")
-                || model_id.as_deref() == Some("veo-3.0-fast-generate-preview")
-            {
-                8 // veo-3.0 only supports 8 seconds
-            } else {
-                duration.clamp(5, 8) // veo-2.0 supports 5-8 seconds
-            }
+            duration.clamp(5, 8)
         }
         None => 5, // Default to 5 seconds
     };
 
-    // Generate audio support (required for veo-3.0)
-    let generate_audio = if model_id.as_deref() == Some("veo-3.0-generate-preview") {
-        Some(config.enable_audio.unwrap_or(false))
-    } else {
-        None // Not supported by veo-2.0
-    };
+    // Generate audio support, only supported by veo-3.0
+    let generate_audio = config.enable_audio;
 
     // Person generation setting
     let person_generation = options
@@ -330,7 +318,7 @@ fn log_unsupported_options(config: &GenerationConfig, options: &HashMap<String, 
     for key in options.keys() {
         if !matches!(
             key.as_str(),
-            "model" | "person_generation" | "sample_count" | "storage_uri"
+            "person_generation" | "sample_count" | "storage_uri"
         ) {
             log::warn!("Provider option '{key}' is not supported by Veo API");
         }
@@ -398,7 +386,6 @@ pub fn cancel_video_generation(
     _client: &VeoApi,
     operation_name: String,
 ) -> Result<String, VideoError> {
-    // Veo API does not support cancellation according to requirements
     Err(VideoError::UnsupportedFeature(format!(
         "Cancellation is not supported by Veo API for operation {operation_name}"
     )))

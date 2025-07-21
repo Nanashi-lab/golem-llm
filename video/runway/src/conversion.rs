@@ -15,10 +15,10 @@ pub fn media_input_to_request(
 ) -> Result<ImageToVideoRequest, VideoError> {
     match input {
         MediaInput::Text(_) => Err(unsupported_feature(
-            "Text-to-video is not supported by Runway API",
+            "Text-to-video should be handled in generate_video function",
         )),
         MediaInput::Video(_) => Err(unsupported_feature(
-            "Video-to-video is not supported by Runway API",
+            "Video-to-video error should be handled in generate_video function",
         )),
         MediaInput::Image(ref_image) => {
             // Extract image data from new InputImage structure
@@ -76,7 +76,7 @@ pub fn media_input_to_request(
                 }
             });
 
-            // Create prompt images based on role and lastframe
+            // Create prompt images based on role only
             let mut prompt_images = Vec::new();
 
             // Determine position from image role (default to "first")
@@ -91,27 +91,9 @@ pub fn media_input_to_request(
                 position: position.to_string(),
             });
 
-            // Handle lastframe if provided
-            if let Some(lastframe) = &config.lastframe {
-                let lastframe_data = match &lastframe.data {
-                    MediaData::Url(url) => url.clone(),
-                    MediaData::Bytes(raw_bytes) => {
-                        use base64::Engine;
-                        let base64_data =
-                            base64::engine::general_purpose::STANDARD.encode(&raw_bytes.bytes);
-                        let mime_type = if !raw_bytes.mime_type.is_empty() {
-                            &raw_bytes.mime_type
-                        } else {
-                            "image/png"
-                        };
-                        format!("data:{mime_type};base64,{base64_data}")
-                    }
-                };
-
-                prompt_images.push(PromptImage {
-                    uri: lastframe_data,
-                    position: "last".to_string(),
-                });
+            // Warn if lastframe is provided (not supported by Runway API)
+            if config.lastframe.is_some() {
+                log::warn!("lastframe is not supported by Runway API and will be ignored");
             }
 
             // Use prompt text from the image if available

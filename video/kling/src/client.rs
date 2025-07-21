@@ -437,7 +437,7 @@ pub struct LipSyncInput {
     pub mode: String,
     // Text2Video mode fields
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub text: Option<String>,
+    pub text: Option<String>, //Text here is limited to 200 characters
     #[serde(skip_serializing_if = "Option::is_none")]
     pub voice_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -446,7 +446,7 @@ pub struct LipSyncInput {
     pub voice_speed: Option<f32>,
     // Audio2Video mode fields
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub audio_type: Option<String>,
+    pub audio_type: Option<String>, //supports audio syncing upto 60 seconds
     #[serde(skip_serializing_if = "Option::is_none")]
     pub audio_file: Option<String>, // Base64 encoded
     #[serde(skip_serializing_if = "Option::is_none")]

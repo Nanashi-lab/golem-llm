@@ -3,10 +3,11 @@ use crate::client::{
     ImageToVideoRequest, KlingApi, LipSyncInput, LipSyncRequest, MultiImageToVideoRequest,
     PollResponse, TextToVideoRequest, TrajectoryPoint, VideoExtendRequest,
 };
+use crate::voices::get_voices;
 use golem_video::error::invalid_input;
 use golem_video::exports::golem::video_generation::types::{
     AspectRatio, AudioSource, CameraMovement, GenerationConfig, JobStatus, MediaData, MediaInput,
-    Resolution, Video, VideoError, VideoResult,
+    Resolution, Video, VideoError, VideoResult, VoiceLanguage,
 };
 use log::trace;
 use std::collections::HashMap;
@@ -26,15 +27,13 @@ pub fn media_input_to_request(
         })
         .unwrap_or_default();
 
-    // Determine model - default to kling-v1, can be overridden
-    let model_name = config.model.clone().or_else(|| {
-        options
-            .get("model")
-            .cloned()
-            .or_else(|| Some("kling-v1".to_string()))
-    });
+    // Determine model - default to kling-v1
+    let model_name = config
+        .model
+        .clone()
+        .or_else(|| Some("kling-v1".to_string()));
 
-    // Validate model if provided
+    // Validate model if provided, Only warn
     if let Some(ref model) = model_name {
         if !matches!(
             model.as_str(),
@@ -51,7 +50,7 @@ pub fn media_input_to_request(
 
     // Duration support - Kling supports 5 and 10 seconds
     let duration = config.duration_seconds.map(|d| {
-        if d <= 5.0 {
+        if d <= 10.0 {
             "5".to_string()
         } else {
             "10".to_string()
@@ -275,7 +274,7 @@ fn convert_camera_control(
 fn convert_dynamic_mask(
     dynamic_mask: &golem_video::exports::golem::video_generation::types::DynamicMask,
 ) -> Result<Vec<DynamicMaskRequest>, VideoError> {
-    // Validate trajectory length (max 77 for 5s video)
+    // Validate trajectory length
     if dynamic_mask.trajectories.len() < 2 {
         return Err(invalid_input(
             "Dynamic mask must have at least 2 trajectory points",
@@ -330,7 +329,7 @@ fn log_unsupported_options(config: &GenerationConfig, options: &HashMap<String, 
 
     // Log unused provider options
     for key in options.keys() {
-        if !matches!(key.as_str(), "model" | "mode") {
+        if !matches!(key.as_str(), "mode") {
             log::warn!("Provider option '{key}' is not supported by Kling API");
         }
     }
@@ -368,7 +367,7 @@ fn log_multi_image_unsupported_options(
 
     // Log unused provider options
     for key in options.keys() {
-        if !matches!(key.as_str(), "model" | "mode") {
+        if !matches!(key.as_str(), "mode") {
             log::warn!("Provider option '{key}' is not supported by Kling multi-image API");
         }
     }
@@ -460,8 +459,26 @@ fn parse_duration_string(duration_str: &str) -> Option<f32> {
     duration_str.parse::<f32>().ok()
 }
 
+fn validate_voice_id_and_language(voice_id: &str, language: &VoiceLanguage) {
+    let language_str = match language {
+        VoiceLanguage::En => "en",
+        VoiceLanguage::Zh => "zh",
+    };
+
+    let available_voices = get_voices(Some(language_str.to_string()));
+    let voice_exists = available_voices
+        .iter()
+        .any(|voice| voice.voice_id == voice_id);
+    // Just warn in case in voice-id are added in the future
+    if !voice_exists {
+        log::warn!(
+            "Voice ID '{voice_id}' is not valid for language '{language_str}'. Please use a valid voice ID from the available voices."
+        );
+    }
+}
+
 pub fn cancel_video_generation(_client: &KlingApi, task_id: String) -> Result<String, VideoError> {
-    // Kling API does not support cancellation according to requirements
+    // Kling API does not support cancellation
     Err(VideoError::UnsupportedFeature(format!(
         "Cancellation is not supported by Kling API for task {task_id}"
     )))
@@ -498,6 +515,9 @@ pub fn generate_lip_sync_video(
             AudioSource::FromText(tts) => {
                 // Text-to-video mode
                 let voice_id = &tts.voice_id;
+
+                // Validate voice_id and language combination, only warn
+                validate_voice_id_and_language(voice_id, &tts.language);
 
                 // Use the language from the TTS object
                 let language = match tts.language {
@@ -585,8 +605,6 @@ pub fn list_available_voices(
     _client: &KlingApi,
     language: Option<String>,
 ) -> Result<Vec<golem_video::exports::golem::video_generation::types::VoiceInfo>, VideoError> {
-    use crate::voices::get_voices;
-
     trace!("Listing available voices for language: {language:?}");
 
     let voices = get_voices(language);
@@ -763,7 +781,7 @@ pub fn generate_video_effects(
 
             // Duration handling - convert from seconds to string
             let duration_str = if let Some(dur) = duration {
-                if dur <= 5.0 {
+                if dur <= 10.0 {
                     "5".to_string()
                 } else {
                     "10".to_string()
@@ -832,12 +850,10 @@ pub fn multi_image_generation(
         .unwrap_or_default();
 
     // Determine model - for multi-image, default to kling-v1-6 as per API docs
-    let model_name = config.model.clone().or_else(|| {
-        options
-            .get("model")
-            .cloned()
-            .or_else(|| Some("kling-v1-6".to_string()))
-    });
+    let model_name = config
+        .model
+        .clone()
+        .or_else(|| Some("kling-v1-6".to_string()));
 
     // Validate model if provided (multi-image endpoint only supports kling-v1-6 according to docs)
     if let Some(ref model) = model_name {
@@ -861,7 +877,7 @@ pub fn multi_image_generation(
 
     // Duration support - Kling supports 5 and 10 seconds
     let duration = config.duration_seconds.map(|d| {
-        if d <= 5.0 {
+        if d <= 10.0 {
             "5".to_string()
         } else {
             "10".to_string()

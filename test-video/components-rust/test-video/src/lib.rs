@@ -51,8 +51,6 @@ impl Guest for Component {
             Err(error) => return format!("ERROR: Failed to generate video: {:?}", error),
         };
 
-        //let job_id = "772257888470433884";
-
         poll_job_until_complete(&job_id, "test1")
     }
 
@@ -196,7 +194,7 @@ impl Guest for Component {
             Err(error) => return format!("ERROR: Failed to generate video: {:?}", error),
         };
 
-        poll_job_until_complete_uri(&job_id, "test4")
+        poll_job_until_complete(&job_id, "test4")
     }
 
     fn test5() -> String {
@@ -369,64 +367,6 @@ fn poll_job_until_complete_with_durability(job_id: &str, test_name: &str) -> Str
         round += 1;
         
         println!("Sleeping for {} seconds", POLLING_SLEEP_SECONDS);
-        // Wait POLLING_SLEEP_SECONDS seconds before polling again
-        thread::sleep(Duration::from_secs(POLLING_SLEEP_SECONDS));
-    }
-}
-
-fn poll_job_until_complete_uri(job_id: &str, test_name: &str) -> String {
-    println!("Polling for {} results with job ID: {} (URI only)", test_name, job_id);
-
-    // Wait 5 seconds after job creation before starting polling
-    println!("Waiting 5 seconds for job initialization...");
-    thread::sleep(Duration::from_secs(5));
-
-    // Poll every POLLING_SLEEP_SECONDS seconds until completion
-    loop {
-        match video_generation::poll(&job_id) {
-            Ok(video_result) => {
-                match video_result.status {
-                    types::JobStatus::Pending => {
-                        println!("{} is pending...", test_name);
-                    }
-                    types::JobStatus::Running => {
-                        println!("{} is running...", test_name);
-                    }
-                    types::JobStatus::Succeeded => {
-                        println!("{} completed successfully!", test_name);
-                        
-                        // Extract URIs from video result without saving to file
-                        if let Some(videos) = &video_result.videos {
-                            if videos.is_empty() {
-                                return format!("{} completed but no videos in result", test_name);
-                            }
-                            // Handle multiple videos by collecting all URIs
-                            let mut results = Vec::new();
-                            
-                            for (i, video_data) in videos.iter().enumerate() {
-                                if let Some(uri) = &video_data.uri {
-                                    results.push(format!("Video {}-{} URI: {}", test_name, i, uri));
-                                } else {
-                                    results.push(format!("Video {}-{} no URI available (video data may be in base64 format)", test_name, i));
-                                }
-                            }
-                            // Join all results with newlines
-                            let uri_results = results.join("\n");
-                            return format!("{} generated successfully.\n{}", test_name, uri_results);
-                        } else {
-                            return format!("{} completed but no videos in result", test_name);
-                        }
-                    }
-                    types::JobStatus::Failed(error_msg) => {
-                        return format!("{} failed: {}", test_name, error_msg);
-                    }
-                }
-            }
-            Err(error) => {
-                return format!("Error polling {}: {:?}", test_name, error);
-            }
-        }
-        
         // Wait POLLING_SLEEP_SECONDS seconds before polling again
         thread::sleep(Duration::from_secs(POLLING_SLEEP_SECONDS));
     }
