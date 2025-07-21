@@ -18,6 +18,8 @@ struct Component;
 
 impl Guest for Component {
     /// test1 demonstrates text-to-video generation with a simple prompt
+    /// In veo's case,  the video needs to be saved to a file
+    /// it used in test4 as input video
     fn test1() -> String {
         println!("Test1: Text to video generation");
         
@@ -219,36 +221,39 @@ impl Guest for Component {
 
 fn save_video_result(video_result: &types::VideoResult, test_name: &str) -> String {
     if let Some(videos) = &video_result.videos {
+        if videos.is_empty() {
+            return "No videos in result".to_string();
+        }
+        // Handle multiple videos by collecting all results
+        let mut results = Vec::new();
         for (i, video_data) in videos.iter().enumerate() {
-            let filename = format!("/output/video-{}-{}.mp4", test_name, i);
-            
-            // Create output directory if it doesn't exist
-            if let Err(err) = fs::create_dir_all("/output") {
-                return format!("Failed to create output directory: {}", err);
-            }
-            
-            // Save the video data
-            match &video_data.base64_bytes {
-                Some(video_bytes) => {
-                    match fs::write(&filename, video_bytes) {
-                        Ok(_) => {
-                            return filename;
-                        }
-                        Err(err) => {
-                            return format!("Failed to save video to {}: {}", filename, err);
-                        }
+            // Check if we have video data to save (like Stability)
+            if let Some(video_bytes) = &video_data.base64_bytes {
+                let filename = format!("/output/video-{}-{}.mp4", test_name, i);
+                
+                // Create output directory if it doesn't exist
+                if let Err(err) = fs::create_dir_all("/output") {
+                    return format!("Failed to create output directory: {}", err);
+                }
+                
+                // Save the video data
+                match fs::write(&filename, video_bytes) {
+                    Ok(_) => {
+                        results.push(filename);
+                    }
+                    Err(err) => {
+                        return format!("Failed to save video to {}: {}", filename, err);
                     }
                 }
-                None => {
-                    if let Some(uri) = &video_data.uri {
-                        return format!("Video available at URI: {}", uri);
-                    } else {
-                        return "No video data or URI available".to_string();
-                    }
-                }
+            } else if let Some(uri) = &video_data.uri {
+                // If no video data but we have a URI (like VEO with GCS URI or Runway/Kling)
+                results.push(format!("Video {}-{} available at URI: {}", test_name, i, uri));
+            } else {
+                results.push(format!("No video data or URI available for video {}-{}", test_name, i));
             }
         }
-        "No videos in result".to_string()
+        // Join all results with newlines
+        results.join("\n")
     } else {
         "No videos in result".to_string()
     }
@@ -390,17 +395,24 @@ fn poll_job_until_complete_uri(job_id: &str, test_name: &str) -> String {
                     types::JobStatus::Succeeded => {
                         println!("{} completed successfully!", test_name);
                         
-                        // Extract URI from video result without saving to file
+                        // Extract URIs from video result without saving to file
                         if let Some(videos) = &video_result.videos {
-                            if let Some(first_video) = videos.first() {
-                                if let Some(uri) = &first_video.uri {
-                                    return format!("{} generated successfully. Video URI: {}", test_name, uri);
-                                } else {
-                                    return format!("{} generated successfully, but no URI available (video data may be in base64 format)", test_name);
-                                }
-                            } else {
+                            if videos.is_empty() {
                                 return format!("{} completed but no videos in result", test_name);
                             }
+                            // Handle multiple videos by collecting all URIs
+                            let mut results = Vec::new();
+                            
+                            for (i, video_data) in videos.iter().enumerate() {
+                                if let Some(uri) = &video_data.uri {
+                                    results.push(format!("Video {}-{} URI: {}", test_name, i, uri));
+                                } else {
+                                    results.push(format!("Video {}-{} no URI available (video data may be in base64 format)", test_name, i));
+                                }
+                            }
+                            // Join all results with newlines
+                            let uri_results = results.join("\n");
+                            return format!("{} generated successfully.\n{}", test_name, uri_results);
                         } else {
                             return format!("{} completed but no videos in result", test_name);
                         }

@@ -136,10 +136,8 @@ impl KlingApi {
                     if let Some(task_result) = task_response.data.task_result {
                         if let Some(videos) = task_result.videos {
                             if let Some(video) = videos.first() {
-                                // Download the video from the URL
-                                let video_data = self.download_video(&video.url)?;
                                 Ok(PollResponse::Complete {
-                                    video_data,
+                                    video_data: None,
                                     mime_type: "video/mp4".to_string(),
                                     duration: video.duration.clone(),
                                     uri: video.url.clone(),
@@ -180,29 +178,6 @@ impl KlingApi {
 
             Err(video_error_from_status(status, error_body))
         }
-    }
-
-    fn download_video(&self, url: &str) -> Result<Vec<u8>, VideoError> {
-        trace!("Downloading video from URL: {url}");
-
-        let response: Response = self
-            .client
-            .get(url)
-            .send()
-            .map_err(|err| from_reqwest_error("Failed to download video", err))?;
-
-        if !response.status().is_success() {
-            return Err(VideoError::InternalError(format!(
-                "Failed to download video: HTTP {}",
-                response.status()
-            )));
-        }
-
-        let bytes = response
-            .bytes()
-            .map_err(|err| from_reqwest_error("Failed to read video data", err))?;
-
-        Ok(bytes.to_vec())
     }
 
     pub fn generate_lip_sync(
@@ -377,7 +352,7 @@ pub struct TaskInfo {
 pub enum PollResponse {
     Processing,
     Complete {
-        video_data: Vec<u8>,
+        video_data: Option<Vec<u8>>,
         mime_type: String,
         duration: String,
         uri: String,
